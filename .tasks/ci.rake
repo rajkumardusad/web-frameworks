@@ -11,31 +11,30 @@ namespace :ci do
     files = []
 
     workdir = ENV.fetch('GITHUB_WORKSPACE') { Dir.pwd }
-    warn "Checking for modification from #{base} to #{last}"
-    git = Git.open(Dir.pwd)
-
-    diff = git.gtree(last).diff(base).each { |diff| files << diff.path }
-    warn "Detected modified files - #{files.join(',')}"
-
-    files.each do |file|
-      if file.match(File::SEPARATOR) && !file.start_with?('.')
-        parts = file.split(File::SEPARATOR)
-        frameworks << parts[0..1].join(File::SEPARATOR)
-      end
-      next unless file.end_with?('Dockerfile')
-      frameworks.pop
-
-      language, = file.split(File::SEPARATOR)
-      Dir.glob("#{language}/*/config.yaml").each do |path|
-        parts = path.split(File::SEPARATOR)
-        frameworks << parts[0..1].join(File::SEPARATOR)
-      end
+    if base && last
+      git = Git.open(Dir.pwd)
+      diff = git.gtree(last).diff(base).each { |diff| files << diff.path }
     end
 
-    if frameworks.empty?
+    if files.empty?
       Dir.glob('*/*/config.yaml').each do |path|
         parts = path.split(File::SEPARATOR)
         frameworks << parts[0..1].join(File::SEPARATOR)
+      end
+    else
+      files.each do |path|
+        parts = path.split(File::SEPARATOR)
+
+        next unless parts.last == 'config.yaml'
+
+        if parts.count == 2
+          Dir.glob("#{parts.first}/*/config.yaml").each do |subpath|
+            subparts = subpath.split(File::SEPARATOR)
+            frameworks << subparts[0..1].join(File::SEPARATOR)
+          end
+        else
+          frameworks << parts[0..1].join(File::SEPARATOR)
+        end
       end
     end
 
